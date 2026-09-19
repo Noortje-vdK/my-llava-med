@@ -1,0 +1,4 @@
+uid,filename,projection,MeSH,Problems,image,indication,comparison,findings,impression,image_path,llavamed_report
+1,1_IM-0001-4001.dcm.png,Frontal,normal,normal,Xray Chest PA and Lateral,Positive TB test,None.,The cardiac silhouette and mediastinum size are within normal limits. There is no pulmonary edema. There is no focal consolidation. There are no XXXX of a pleural effusion. There is no evidence of pneumothorax.,Normal chest x-XXXX.,/kaggle/input/chest-xrays-indiana-university/images/images_normalized/1_IM-0001-4001.dcm.png,"Findings: The chest X-ray shows a widened superior mediastinum.
+
+Impression: The widened superior mediastinum in the chest X-ray may indicate an abnormality or enlargement in that area. This could be due to various reasons, such as a mass, an enlarged blood vessel, or other pathological conditions. Further evaluation and clinical correlation are needed to determine the cause and significance of this finding."

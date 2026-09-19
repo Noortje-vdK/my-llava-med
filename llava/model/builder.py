@@ -24,20 +24,13 @@ def load_pretrained_model(
         kwargs["load_in_8bit"] = True
 
     elif load_4bit:
-        kwargs["quantization_config"] = BitsAndBytesConfig(
+        kwargs['load_in_4bit'] = True
+        kwargs['quantization_config'] = BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_compute_dtype=torch.float16,
             bnb_4bit_use_double_quant=True,
-            bnb_4bit_quant_type="nf4",
-            llm_int8_enable_fp32_cpu_offload=True,
+            bnb_4bit_quant_type='nf4'
         )
-
-        kwargs["device_map"] = "auto"
-
-        kwargs["max_memory"] = {
-            0: "3GiB",
-            "cpu": "12GiB",
-        }
 
     else:
         kwargs["torch_dtype"] = torch.float16

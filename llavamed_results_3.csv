@@ -1,0 +1,19 @@
+uid,filename,projection,MeSH,Problems,image,indication,comparison,findings,impression,image_path,llavamed_report
+1,1_IM-0001-4001.dcm.png,Frontal,normal,normal,Xray Chest PA and Lateral,Positive TB test,None.,The cardiac silhouette and mediastinum size are within normal limits. There is no pulmonary edema. There is no focal consolidation. There are no XXXX of a pleural effusion. There is no evidence of pneumothorax.,Normal chest x-XXXX.,/kaggle/input/chest-xrays-indiana-university/images/images_normalized/1_IM-0001-4001.dcm.png,"Findings:
+- Normal cardiothoracic ratio
+- No evidence of pulmonary vascular congestion or edema
+- No evidence of pleural effusion
+- No evidence of pulmonary consolidation or infiltration
+
+Impression:
+The chest X-ray appears to be normal, with no significant abnormalities detected. This means that the heart size, lung fields, and surrounding structures all appear to be within normal limits."
+2,2_IM-0652-1001.dcm.png,Frontal,Cardiomegaly/borderline;Pulmonary Artery/enlarged,Cardiomegaly;Pulmonary Artery,"Chest, 2 views, frontal and lateral",Preop bariatric surgery.,None.,Borderline cardiomegaly. Midline sternotomy XXXX. Enlarged pulmonary arteries. Clear lungs. Inferior XXXX XXXX XXXX.,No acute pulmonary findings.,/kaggle/input/chest-xrays-indiana-university/images/images_normalized/2_IM-0652-1001.dcm.png,"Radiology Report:
+
+Findings:
+1. Cardiomegaly, which is an enlargement of the heart.
+2. Pulmonary congestion, which is a buildup of fluid in the lungs.
+3. Bilateral lung infiltrates, which are abnormal substances or cells that have entered the lung tissue.
+
+Impression:
+The chest X-ray reveals cardiomegaly, pulmonary congestion, and bilateral lung infiltrates. These findings suggest that there may be an underlying issue affecting the patient's heart and lungs. Further evaluation and consultation with a healthcare professional are necessary to determine the cause and appropriate treatment for these findings."
+3,3_IM-1384-1001.dcm.png,Frontal,normal,normal,Xray Chest PA and Lateral,"rib pain after a XXXX, XXXX XXXX steps this XXXX. Pain to R back, R elbow and R rib XXXX, no previous heart or lung hx, non-XXXX, no hx ca",,,"No displaced rib fractures, pneumothorax, or pleural effusion identified. Well-expanded and clear lungs. Mediastinal contour within normal limits. No acute cardiopulmonary abnormality identified.",/kaggle/input/chest-xrays-indiana-university/images/images_normalized/3_IM-1384-1001.dcm.png,"Findings: The chest X-ray shows mild cardiomegaly, which is a slight enlargement of the heart. Additionally, there is a mild left-sided pleural effusion, which is a small amount of fluid accumulation in the pleural space surrounding the lungs."
