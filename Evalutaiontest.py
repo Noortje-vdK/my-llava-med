@@ -1,6 +1,7 @@
 import re
 import pandas as pd
 from radgraph import F1RadGraph
+from RaTEScore import RaTEScore
 
 def load_reports(path):
     """
@@ -69,6 +70,7 @@ def clean_df(df):
 data, refs, hyps = load_reports("llavamed_results_10.csv")
 print("PROCESSED DATA")
 print(data.head())
+assert len(refs) == len(hyps) # check if every reference report is linked to a generated report
 
 # implementation of RadGraph F1
 f1radgraph = F1RadGraph(reward_level="all", model_type="radgraph-xl")
@@ -78,3 +80,12 @@ rg_e, rg_er, rg_bar_er = mean_reward
 
 print("RADGRAPH METRIC")
 print(mean_reward)
+
+# implementation of RaTEScore metric
+ratescore = RaTEScore()
+scores = ratescore.compute_score(hyps, refs)
+
+print("RATESCORE METRIC")
+print(scores)
+print("average RaTEScore")
+print(sum(scores)/len(scores))
