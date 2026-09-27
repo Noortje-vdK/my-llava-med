@@ -38,8 +38,8 @@ import gc
 from transformers import MistralForCausalLM, set_seed
 
 # Import of functions by the VCD modules itself
-from vcd_utils.vcd_add_noise import add_diffusion_noise
-from vcd_utils.vcd_sample import evolve_vcd_sampling
+from VCD.vcd_add_noise import add_diffusion_noise
+from VCD.vcd_sample import evolve_vcd_sampling
 
 # Settings needed for the VCD model
 USE_CD: bool = True        # True, then CD ; False, then no CD
@@ -61,7 +61,8 @@ gc.collect()
 torch.cuda.empty_cache()
 
 # Root folder downloaded from Kaggle
-DATASET_ROOT: Path = Path(r"/kaggle/input/chest-xrays-indiana-university") # this is the path you may have to change to direct to the dataset
+#DATASET_ROOT: Path = Path(r"/kaggle/input/chest-xrays-indiana-university") # this is the path you may have to change to direct to the dataset
+DATASET_ROOT: Path = Path(r"/home/20213144/.cache/kagglehub/datasets/raddar/chest-xrays-indiana-university/versions/2") 
 REPORTS_CSV: Path = DATASET_ROOT / "indiana_reports.csv"
 PROJECTIONS_CSV: Path = DATASET_ROOT / "indiana_projections.csv"
 IMAGE_DIR: Path = DATASET_ROOT / "images" / "images_normalized"
@@ -69,17 +70,23 @@ IMAGE_DIR: Path = DATASET_ROOT / "images" / "images_normalized"
 # LLaVA-Med model
 MODEL_NAME: str = "microsoft/llava-med-v1.5-mistral-7b"
 
+
+
 # Number of studies to process, change this to desired nr of reports
-N: int = 3
+N: int = 400
 
 # Save output in the same folder as this Python script
 OUTPUT_DIR = Path(__file__).resolve().parent
 
+results = OUTPUT_DIR / "results"
+
+results.mkdir(parents=True, exist_ok=True)
+
 # Results including CD, then need a seperate output folder
 if USE_CD:
-    OUTPUT_CSV = OUTPUT_DIR / f"llavamed_results_{N}_vcd.csv"
+    OUTPUT_CSV = results / f"llavamed_results_{N}_vcd.csv"
 else:
-    OUTPUT_CSV = OUTPUT_DIR / f"llavamed_results_{N}.csv"
+    OUTPUT_CSV = results / f"llavamed_results_{N}.csv"
 
 
 # device things
@@ -345,8 +352,10 @@ model.prepare_inputs_for_generation_cd = prepare_inputs_for_generation_cd
 
 # ------------------------------------------------- END NEW
 
+
+
 # generate rpeort
-def generate_report(image_path: Path) -> str:
+def generate_report(image_path: Path, USE_CD=True) -> str:
     """
     Generate a radiology report from one chest X-ray.
     """
@@ -503,40 +512,51 @@ def generate_report(image_path: Path) -> str:
 
     return report
 
+
+
+# ------------------------------------------------- New Ferry
+
 # run inference 
 generated_reports: list[str] = []
 
+using_vcd = [False, True]
+
 for _, row in df.iterrows():
+    for USE_CD in using_vcd:
+        
+        uid = row["uid"]
+        image_path = Path(row["image_path"])
+    
+        try:
+    
+            report = generate_report(image_path, USE_CD)
+    
+            generated_reports.append(report)
+    
+            print("\n" + "=" * 80)
+            print(f"Study UID: {uid}")
+            print(f"Using VCD: {USE_CD}")
+            print("\nLLaVA-Med report:")
+            print(report)
+            print("=" * 80)
+    
+        except Exception as exc:
+    
+            error_message = (
+                f"ERROR processing {uid}: "
+                f"{type(exc).__name__}: {exc}"
+            )
+    
+            print(error_message)
+    
+            generated_reports.append(error_message)
 
-    uid = row["uid"]
-    image_path = Path(row["image_path"])
-
-    try:
-
-        report = generate_report(image_path)
-
-        generated_reports.append(report)
-
-        print("\n" + "=" * 80)
-        print(f"Study UID: {uid}")
-        print("\nLLaVA-Med report:")
-        print(report)
-        print("=" * 80)
-
-    except Exception as exc:
-
-        error_message = (
-            f"ERROR processing {uid}: "
-            f"{type(exc).__name__}: {exc}"
-        )
-
-        print(error_message)
-
-        generated_reports.append(error_message)
 
 
 # save results
-df["llavamed_report"] = generated_reports
+df["llavamed_report"] = generated_reports[::2]
+df["llavamed_report_with_VCD"] = generated_reports[1::2]
+
 
 print("\nColumns being saved:")
 print(df.columns.tolist())
@@ -557,3 +577,6 @@ df.to_csv(
 print("\nFinished.")
 print("Results saved to:")
 print(OUTPUT_CSV)
+
+
+# ---------------------------------- End new ferry
