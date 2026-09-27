@@ -1,11 +1,39 @@
 import re
-import json
-
+import pandas as pd
 from radgraph import F1RadGraph
-from deepeval.metrics import HallucinationMetric
-from deepeval.test_case import LLMTestCase
-from deepeval import evaluate
 
+def load_reports(path):
+    """
+    Input: csv-file with provided and generated information for each image.
+    Formulates a reference report with the combined Findings and Impressions of the reference
+    and returns the reference and generated reports as lists of strings
+    Output:
+    - df: the altered dataframe.
+    - refs: list of strings of reference reports.
+    - gens: list of strings of generated reports.
+    """
+
+    # load and clean data
+    df = pd.read_csv(path)
+    df_clean = clean_df(df)
+
+    # create reference report
+    df["reference_report"] = df.apply(
+        lambda row: f"Findings: {row['findings']}", # Impressions: {row['impression']}", --> nu alleen findings
+        axis=1
+    )
+
+    # clean final reports
+    df["reference_report_clean"] = df["reference_report"].apply(normalize_reports)
+    df["generated_report_clean"] = df["llavamed_report"].apply(normalize_reports)
+
+    # return as lists of strings
+    refs = df["reference_report_clean"].astype(str).tolist()
+    gens = df["generated_report_clean"].astype(str).tolist()
+
+    return df, refs, gens
+
+        
 def normalize_reports(report):
     """
     Input: each report is inputted as a separate string
@@ -18,47 +46,29 @@ def normalize_reports(report):
     - removal of enters and tabs
     - trailing whitespace
     """
-    report = re.sub(r"\bfindings\s*:?", "", report, flags=re.IGNORECASE)
-    report = re.sub(r"\bimpression\b.*", "", report, flags=re.IGNORECASE | re.DOTALL) # removes entire impression section because it is cut off for now.
-    report = re.sub(r"\bim\b", "", report, flags=re.IGNORECASE) # removes the "Im" that is cut off in this example
+
     report = re.sub(r"^\s*[\*\-\•]\s*", "", report, flags=re.MULTILINE)
     report = re.sub(r"\s+", " ", report)
     report = report.strip()
 
     return report
 
-# load reports
-with open("reference_reports.json", "r") as f:
-    reference_reports = json.load(f)
+def clean_df(df):
+    """
+    Input: raw dataframe
+    Output: pre-processed dataframe that is clean to use
+    """
+    df_clean = df
+    # assume missing findings and impressions mean there is nothing to comment
+    df_clean["findings"] = df_clean["findings"].fillna("").astype(str)
+    df_clean["impression"] = df_clean["impression"].fillna("").astype(str)
+    df_clean["llavamed_report"] = df_clean["llavamed_report"].fillna("").astype(str)
 
-with open("generated_reports.json", "r") as f:
-    generated_reports = json.load(f)
+    return df_clean
 
-# preprocess reports
-selected_ref_report = reference_reports["5"] # select report using uid - manually selected here
-norm_sel_ref_report = normalize_reports(selected_ref_report)
-
-selected_gen_report = generated_reports["5"] # select report using uid - manually selected here
-norm_sel_gen_report = normalize_reports(selected_gen_report)
-
-"""
-print("REFERENCE REPORT PRE")
-print(selected_ref_report)
-print("REFERENCE REPORT POST")
-print(norm_sel_ref_report)
-
-print("GENERATED REPORT PRE")
-print(selected_gen_report)
-print("GENERATED REPORT POST")
-print(norm_sel_gen_report)
-"""
-
-# reports saved as a list of strings
-refs = [norm_sel_ref_report]
-hyps = [norm_sel_gen_report]
-
-print(refs)
-print(hyps)
+data, refs, hyps = load_reports("llavamed_results_10.csv")
+print("PROCESSED DATA")
+print(data.head())
 
 # implementation of RadGraph F1
 f1radgraph = F1RadGraph(reward_level="all", model_type="radgraph-xl")
@@ -68,16 +78,3 @@ rg_e, rg_er, rg_bar_er = mean_reward
 
 print("RADGRAPH METRIC")
 print(mean_reward)
-
-"""
-# LLM-as-a-jugde hallucination metric
-test_case = LLMTestCase(
-    input="You are an expert radiologist. Write a concise radiology report for this frontal chest X-ray. Use Findings and Impression sections. Describe only findings supported by the image and state uncertainty when necessary.",
-    actual_output=norm_sel_gen_report,
-    context=[norm_sel_ref_report]
-)
-metric = HallucinationMetric(threshold=0.5)
-
-print("LLM-as-a-judge HALLUCINATION MODEL")
-evaluate(test_cases=[test_case], metrics=[metric])
-"""
