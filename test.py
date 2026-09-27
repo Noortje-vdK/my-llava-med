@@ -321,7 +321,7 @@ def generate_report(image_path: Path) -> str:
             do_sample=True, # set to false if you dont want to use temp and top-p
             temperature=0.7,
             top_p=0.95,
-            max_new_tokens=512, # change this to allow longer/shorter reports
+            max_new_tokens=1024, # change this to allow longer/shorter reports
             use_cache=True,
             pad_token_id=tokenizer.eos_token_id,
         )
