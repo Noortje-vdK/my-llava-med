@@ -38,8 +38,8 @@ import gc
 from transformers import MistralForCausalLM, set_seed
 
 # Import of functions by the VCD modules itself
-from vcd_utils.vcd_add_noise import add_diffusion_noise
-from vcd_utils.vcd_sample import evolve_vcd_sampling
+from VCD.vcd_add_noise import add_diffusion_noise
+from VCD.vcd_sample import evolve_vcd_sampling
 
 # Settings needed for the VCD model
 USE_CD: bool = True        # True, then CD ; False, then no CD
@@ -71,9 +71,14 @@ MODEL_NAME: str = "microsoft/llava-med-v1.5-mistral-7b"
 
 # Number of studies to process, change this to desired nr of reports
 N: int = 3
+OPTIMIZATION_N: int = 50
 
 # Save output in the same folder as this Python script
 OUTPUT_DIR = Path(__file__).resolve().parent
+OPTIMIZATION_RESULTS_CSV = (
+    OUTPUT_DIR.parent
+    / f"llavamed_vcd_gridsearch_{OPTIMIZATION_N}.csv"
+)
 
 # Results including CD, then need a seperate output folder
 if USE_CD:
@@ -204,8 +209,40 @@ df = df[
 
 print(f"Usable studies: {len(df)}")
 
+if not OPTIMIZATION_RESULTS_CSV.is_file():
+    raise FileNotFoundError(
+        "Optimization results not found. Run optimize.py first or update "
+        f"OPTIMIZATION_RESULTS_CSV:\n{OPTIMIZATION_RESULTS_CSV}"
+    )
 
-# select nr of studies 
+optimization_results = pd.read_csv(OPTIMIZATION_RESULTS_CSV)
+if "uid" not in optimization_results.columns:
+    raise ValueError(
+        "Optimization results CSV must contain a 'uid' column: "
+        f"{OPTIMIZATION_RESULTS_CSV}"
+    )
+
+optimized_uids = set(
+    optimization_results["uid"]
+    .dropna()
+    .astype(str)
+    .str.strip()
+)
+if not optimized_uids:
+    raise ValueError(
+        "Optimization results CSV contains no study UIDs: "
+        f"{OPTIMIZATION_RESULTS_CSV}"
+    )
+
+before_exclusion = len(df)
+df = df[
+    ~df["uid"].astype(str).str.strip().isin(optimized_uids)
+].copy()
+print(
+    f"Excluded {before_exclusion - len(df)} optimization studies; "
+    f"{len(df)} studies remain."
+)
+
 df = df.head(N).copy()
 
 print(f"Running LLaVA-Med on {len(df)} studies.")

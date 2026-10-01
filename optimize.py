@@ -63,7 +63,7 @@ NOISE_STEP_VALUES = [
 ]
 
 #number of studies to search on
-N = 3
+N = 50
 
 
 #dataset
