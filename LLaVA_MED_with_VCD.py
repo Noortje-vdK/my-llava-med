@@ -43,10 +43,10 @@ from VCD.vcd_sample import evolve_vcd_sampling
 
 # Settings needed for the VCD model
 USE_CD: bool = True        # True, then CD ; False, then no CD
-NOISE_STEP: int = 500      # Diffusion step of the distorted image (in VCD article between 0-999 was tested)
-CD_ALPHA: float = 1.0      # Contrast strength,are
-CD_BETA: float = 0.2       # Cutoff
-SEED: int = 20             # For reprodubility of the random sampled noise
+NOISE_STEP: int = 250      # Diffusion step of the distorted image (in VCD article between 0-999 was tested)
+CD_ALPHA: float = 0.5      # Contrast strength,are
+CD_BETA: float = 0.3      # Cutoff
+SEED: int = 21             # For reprodubility of the random sampled noise
 
 # Below replaces the transformer of the LLaVA-MED with the transformer of the VCD
 # Difference between transformer LLaVA-MED and VCD: both do exactly the same, only VCD applies it parallel to the
@@ -73,7 +73,7 @@ MODEL_NAME: str = "microsoft/llava-med-v1.5-mistral-7b"
 
 
 # Number of studies to process, change this to desired nr of reports
-N: int = 400
+N: int = 450
 
 # Save output in the same folder as this Python script
 OUTPUT_DIR = Path(__file__).resolve().parent
@@ -212,8 +212,24 @@ df = df[
 print(f"Usable studies: {len(df)}")
 
 
-# select nr of studies 
-df = df.head(N).copy()
+# Number of studies already used for parameter optimization
+OPTIMIZATION_N = 50
+
+# Number of NEW studies to process
+N = 450
+
+# Skip the first 50 studies and then select the next N studies
+df = df.iloc[OPTIMIZATION_N:OPTIMIZATION_N + N].copy()
+
+print(
+    f"Skipping first {OPTIMIZATION_N} studies "
+    f"(used for optimization)."
+)
+
+print(
+    f"Running LLaVA-Med on {len(df)} new studies "
+    f"(studies {OPTIMIZATION_N + 1}–{OPTIMIZATION_N + len(df)})."
+)
 
 print(f"Running LLaVA-Med on {len(df)} studies.")
 
