@@ -43,9 +43,9 @@ from VCD.vcd_sample import evolve_vcd_sampling
 
 # Settings needed for the VCD model
 USE_CD: bool = True        # True, then CD ; False, then no CD
-NOISE_STEP: int = 250      # Diffusion step of the distorted image (in VCD article between 0-999 was tested)
-CD_ALPHA: float = 0.5      # Contrast strength,are
-CD_BETA: float = 0.3      # Cutoff
+NOISE_STEP: int = 100      # Diffusion step of the distorted image (in VCD article between 0-999 was tested)
+CD_ALPHA: float = 1.25      # Contrast strength,are
+CD_BETA: float = 0.05      # Cutoff
 SEED: int = 21             # For reprodubility of the random sampled noise
 
 # Below replaces the transformer of the LLaVA-MED with the transformer of the VCD

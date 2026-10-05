@@ -77,10 +77,10 @@ def parse_args():
     parser.add_argument(
         "--metric",
         choices=REWARD_COLUMNS,
-        default="radgraph_bar_er",
+        default="radgraph_er",
         help=(
             "RadGraph metric used to determine the best parameter "
-            "combination. Default: radgraph_bar_er"
+            "combination. Default: radgraph_er"
         ),
     )
 
