@@ -9,6 +9,11 @@ from models.bert_labeler import bert_labeler
 from bert_tokenizer import tokenize
 from transformers import BertTokenizer
 from collections import OrderedDict
+import sys
+from pathlib import Path
+
+CHEXBERT_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(CHEXBERT_DIR))
 from datasets.unlabeled_dataset import UnlabeledDataset
 from constants import *
 from tqdm import tqdm
@@ -111,6 +116,7 @@ def save_preds(y_pred, csv_path, out_path):
     @param csv_path (string): path to csv containing reports
     @param out_path (string): path to output directory
     """
+    os.makedirs(out_path, exist_ok=True)
     y_pred = np.array(y_pred)
     y_pred = y_pred.T
     

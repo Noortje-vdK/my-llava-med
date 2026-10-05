@@ -93,9 +93,6 @@ def main():
     if args.batch_size < 1:
         raise ValueError("--batch-size must be at least 1")
 
-    # ---------------------------------------------------------
-    # Load input CSV
-    # ---------------------------------------------------------
     df = pd.read_csv(args.input)
 
     missing_columns = REQUIRED_COLUMNS.difference(df.columns)
@@ -109,9 +106,7 @@ def main():
     if df.empty:
         raise ValueError("Input CSV contains no rows.")
 
-    # ---------------------------------------------------------
-    # Create reference and hypothesis reports
-    # ---------------------------------------------------------
+    # create reference and generated report
     references = df.apply(make_reference, axis=1).tolist()
     hypotheses = df["llavamed_report"].map(clean_text).tolist()
 
@@ -119,9 +114,7 @@ def main():
     for column in REWARD_COLUMNS:
         df[column] = pd.NA
 
-    # ---------------------------------------------------------
-    # Initialize RadGraph
-    # ---------------------------------------------------------
+    # initialize radgraph
     print("Loading RadGraph model...")
 
     radgraph = F1RadGraph(
@@ -131,9 +124,7 @@ def main():
 
     print("RadGraph model loaded.\n")
 
-    # ---------------------------------------------------------
-    # Calculate per-row RadGraph scores
-    # ---------------------------------------------------------
+    # calculate RadGraph scores per row
     for start in range(0, len(df), args.batch_size):
         end = min(start + args.batch_size, len(df))
 
@@ -184,18 +175,14 @@ def main():
                 f"bar_er={radgraph_bar_er:.4f}"
             )
 
-    # ---------------------------------------------------------
-    # Convert score columns to numeric
-    # ---------------------------------------------------------
+    # convert score columns to numeric, coercing any errors to NaN
     for column in REWARD_COLUMNS:
         df[column] = pd.to_numeric(
             df[column],
             errors="coerce",
         )
 
-    # ---------------------------------------------------------
-    # Save per-row scores
-    # ---------------------------------------------------------
+    # save score per row
     df.to_csv(args.output, index=False)
 
     print(
@@ -203,9 +190,7 @@ def main():
         f"{args.output}"
     )
 
-    # ---------------------------------------------------------
-    # Calculate average score for each parameter combination
-    # ---------------------------------------------------------
+    # average for evey parameter combination
     summary_df = (
         df.groupby(PARAMETER_COLUMNS, dropna=False)[REWARD_COLUMNS]
         .agg(["mean", "count"])
@@ -227,9 +212,7 @@ def main():
         }
     )
 
-    # ---------------------------------------------------------
-    # Sort combinations by the selected metric
-    # ---------------------------------------------------------
+    # sort the averages by the metric
     selected_mean_column = f"{args.metric}_mean"
 
     summary_df = summary_df.sort_values(
@@ -237,9 +220,7 @@ def main():
         ascending=False,
     ).reset_index(drop=True)
 
-    # ---------------------------------------------------------
-    # Save summary
-    # ---------------------------------------------------------
+    # save summary 
     summary_df.to_csv(
         args.summary_output,
         index=False,
@@ -250,9 +231,7 @@ def main():
         f"{args.summary_output}"
     )
 
-    # ---------------------------------------------------------
-    # Print all parameter combinations
-    # ---------------------------------------------------------
+    # print the results for all parameter combinations
     print("\n" + "=" * 80)
     print("AVERAGE RADGRAPH SCORE PER PARAMETER COMBINATION")
     print("=" * 80)
@@ -269,9 +248,7 @@ def main():
             f"bar_er={row['radgraph_bar_er_mean']:.4f}"
         )
 
-    # ---------------------------------------------------------
-    # Find and print best parameter combination
-    # ---------------------------------------------------------
+    # find best parameter combination based on the selected metric
     best_row = summary_df.iloc[0]
 
     print("\n" + "=" * 80)
