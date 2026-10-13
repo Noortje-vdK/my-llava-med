@@ -38,15 +38,15 @@ import gc
 from transformers import MistralForCausalLM, set_seed
 
 # Import of functions by the VCD modules itself
-from VCD.vcd_add_noise import add_diffusion_noise
-from VCD.vcd_sample import evolve_vcd_sampling
+from PROJECT_VCD.vcd_add_noise import add_diffusion_noise
+from PROJECT_VCD.vcd_sample import evolve_vcd_sampling
 
 # Settings needed for the VCD model
 USE_CD: bool = True        # True, then CD ; False, then no CD
-NOISE_STEP: int = 500      # Diffusion step of the distorted image (in VCD article between 0-999 was tested)
-CD_ALPHA: float = 1.0      # Contrast strength,are
-CD_BETA: float = 0.2       # Cutoff
-SEED: int = 20             # For reprodubility of the random sampled noise
+NOISE_STEP: int = 100      # Diffusion step of the distorted image (in VCD article between 0-999 was tested)
+CD_ALPHA: float = 1.25      # Contrast strength,are
+CD_BETA: float = 0.05      # Cutoff
+SEED: int = 21             # For reprodubility of the random sampled noise
 
 # Below replaces the transformer of the LLaVA-MED with the transformer of the VCD
 # Difference between transformer LLaVA-MED and VCD: both do exactly the same, only VCD applies it parallel to the
@@ -61,7 +61,8 @@ gc.collect()
 torch.cuda.empty_cache()
 
 # Root folder downloaded from Kaggle
-DATASET_ROOT: Path = Path(r"/kaggle/input/chest-xrays-indiana-university") # this is the path you may have to change to direct to the dataset
+#DATASET_ROOT: Path = Path(r"/kaggle/input/chest-xrays-indiana-university") # this is the path you may have to change to direct to the dataset
+DATASET_ROOT: Path = Path(r"/home/20213144/.cache/kagglehub/datasets/raddar/chest-xrays-indiana-university/versions/2") 
 REPORTS_CSV: Path = DATASET_ROOT / "indiana_reports.csv"
 PROJECTIONS_CSV: Path = DATASET_ROOT / "indiana_projections.csv"
 IMAGE_DIR: Path = DATASET_ROOT / "images" / "images_normalized"
@@ -69,22 +70,23 @@ IMAGE_DIR: Path = DATASET_ROOT / "images" / "images_normalized"
 # LLaVA-Med model
 MODEL_NAME: str = "microsoft/llava-med-v1.5-mistral-7b"
 
+
+
 # Number of studies to process, change this to desired nr of reports
-N: int = 3
-OPTIMIZATION_N: int = 50
+N: int = 450
 
 # Save output in the same folder as this Python script
 OUTPUT_DIR = Path(__file__).resolve().parent
-OPTIMIZATION_RESULTS_CSV = (
-    OUTPUT_DIR.parent
-    / f"llavamed_vcd_gridsearch_{OPTIMIZATION_N}.csv"
-)
+
+results = OUTPUT_DIR / "PROJECT_RESULTS"
+
+results.mkdir(parents=True, exist_ok=True)
 
 # Results including CD, then need a seperate output folder
 if USE_CD:
-    OUTPUT_CSV = OUTPUT_DIR / f"llavamed_results_{N}_vcd.csv"
+    OUTPUT_CSV = results / f"llavamed_results_{N}_vcd.csv"
 else:
-    OUTPUT_CSV = OUTPUT_DIR / f"llavamed_results_{N}.csv"
+    OUTPUT_CSV = results / f"llavamed_results_{N}.csv"
 
 
 # device things
@@ -209,41 +211,25 @@ df = df[
 
 print(f"Usable studies: {len(df)}")
 
-if not OPTIMIZATION_RESULTS_CSV.is_file():
-    raise FileNotFoundError(
-        "Optimization results not found. Run optimize.py first or update "
-        f"OPTIMIZATION_RESULTS_CSV:\n{OPTIMIZATION_RESULTS_CSV}"
-    )
 
-optimization_results = pd.read_csv(OPTIMIZATION_RESULTS_CSV)
-if "uid" not in optimization_results.columns:
-    raise ValueError(
-        "Optimization results CSV must contain a 'uid' column: "
-        f"{OPTIMIZATION_RESULTS_CSV}"
-    )
+# Number of studies already used for parameter optimization
+OPTIMIZATION_N = 50
 
-optimized_uids = set(
-    optimization_results["uid"]
-    .dropna()
-    .astype(str)
-    .str.strip()
-)
-if not optimized_uids:
-    raise ValueError(
-        "Optimization results CSV contains no study UIDs: "
-        f"{OPTIMIZATION_RESULTS_CSV}"
-    )
+# Number of NEW studies to process
+N = 450
 
-before_exclusion = len(df)
-df = df[
-    ~df["uid"].astype(str).str.strip().isin(optimized_uids)
-].copy()
+# Skip the first 50 studies and then select the next N studies
+df = df.iloc[OPTIMIZATION_N:OPTIMIZATION_N + N].copy()
+
 print(
-    f"Excluded {before_exclusion - len(df)} optimization studies; "
-    f"{len(df)} studies remain."
+    f"Skipping first {OPTIMIZATION_N} studies "
+    f"(used for optimization)."
 )
 
-df = df.head(N).copy()
+print(
+    f"Running LLaVA-Med on {len(df)} new studies "
+    f"(studies {OPTIMIZATION_N + 1}–{OPTIMIZATION_N + len(df)})."
+)
 
 print(f"Running LLaVA-Med on {len(df)} studies.")
 
@@ -382,8 +368,10 @@ model.prepare_inputs_for_generation_cd = prepare_inputs_for_generation_cd
 
 # ------------------------------------------------- END NEW
 
+
+
 # generate rpeort
-def generate_report(image_path: Path) -> str:
+def generate_report(image_path: Path, USE_CD=True) -> str:
     """
     Generate a radiology report from one chest X-ray.
     """
@@ -540,40 +528,51 @@ def generate_report(image_path: Path) -> str:
 
     return report
 
+
+
+# ------------------------------------------------- New Ferry
+
 # run inference 
 generated_reports: list[str] = []
 
+using_vcd = [False, True]
+
 for _, row in df.iterrows():
+    for USE_CD in using_vcd:
+        
+        uid = row["uid"]
+        image_path = Path(row["image_path"])
+    
+        try:
+    
+            report = generate_report(image_path, USE_CD)
+    
+            generated_reports.append(report)
+    
+            print("\n" + "=" * 80)
+            print(f"Study UID: {uid}")
+            print(f"Using VCD: {USE_CD}")
+            print("\nLLaVA-Med report:")
+            print(report)
+            print("=" * 80)
+    
+        except Exception as exc:
+    
+            error_message = (
+                f"ERROR processing {uid}: "
+                f"{type(exc).__name__}: {exc}"
+            )
+    
+            print(error_message)
+    
+            generated_reports.append(error_message)
 
-    uid = row["uid"]
-    image_path = Path(row["image_path"])
-
-    try:
-
-        report = generate_report(image_path)
-
-        generated_reports.append(report)
-
-        print("\n" + "=" * 80)
-        print(f"Study UID: {uid}")
-        print("\nLLaVA-Med report:")
-        print(report)
-        print("=" * 80)
-
-    except Exception as exc:
-
-        error_message = (
-            f"ERROR processing {uid}: "
-            f"{type(exc).__name__}: {exc}"
-        )
-
-        print(error_message)
-
-        generated_reports.append(error_message)
 
 
 # save results
-df["llavamed_report"] = generated_reports
+df["llavamed_report"] = generated_reports[::2]
+df["llavamed_report_with_VCD"] = generated_reports[1::2]
+
 
 print("\nColumns being saved:")
 print(df.columns.tolist())
@@ -594,3 +593,6 @@ df.to_csv(
 print("\nFinished.")
 print("Results saved to:")
 print(OUTPUT_CSV)
+
+
+# ---------------------------------- End new ferry

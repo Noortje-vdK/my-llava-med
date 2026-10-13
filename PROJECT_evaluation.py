@@ -6,7 +6,8 @@ import tempfile
 from pathlib import Path
 
 import pandas as pd
-
+#file path of the reports file you want to evaluate
+file_path = "PROJECT_RESULTS/llavamed_results_450_vcd(1).csv" 
 
 BASE_REPORT_COLUMN = "llavamed_report"
 VCD_REPORT_COLUMNS = ("llavamed_report_with_VCD", "llavamed_report_with_VDD")
@@ -14,7 +15,7 @@ REFERENCE_COLUMNS = ("findings", "impression")
 RADGRAPH_METRICS = ("e", "er", "bar_er")
 CHAIR_SCRIPT = (
     Path(__file__).resolve().parent
-    / "Scripts for processing - CHAIR"
+    / "PROJECT_CHAIR"
     / "chair_utils"
     / "chexbert"
     / "label.py"
@@ -56,12 +57,12 @@ def parse_args():
     parser.add_argument(
         "input",
         nargs="?",
-        default="results/llavamed_results_450_vcd.csv",  # hier pas je je filenaam aan
+        default=file_path,
         help="Input results CSV.",
     )
     parser.add_argument(
         "--output",
-        default="results/llavamed_results_450_vcd_metrics.csv", # hier pas je je filenaam aan
+        default=file_path.replace(".csv", "_metrics.csv"), 
         help="Output CSV containing per-row scores.",
     )
     parser.add_argument(
@@ -266,48 +267,165 @@ def main():
     input_path = Path(args.input)
     output_path = Path(args.output)
 
-    df = pd.read_csv(input_path)
+    df_original = pd.read_csv(input_path)
+
     required_columns = {"findings", "impression", BASE_REPORT_COLUMN}
-    missing = required_columns.difference(df.columns)
+    missing = required_columns.difference(df_original.columns)
     if missing:
         raise ValueError(f"Input CSV is missing required columns: {sorted(missing)}")
-    if df.empty:
+    if df_original.empty:
         raise ValueError("Input CSV contains no rows")
 
-    vcd_column = get_vcd_column(df, args.vcd_column)
+    vcd_column = get_vcd_column(df_original, args.vcd_column)
+
+    # ------------------------------------------------------------------
+    # Build a single clean evaluation cohort.
+    #
+    # A case is included only when all four components required for the
+    # evaluation are present and non-empty:
+    #   1. findings
+    #   2. impression
+    #   3. base LLaVA-Med report
+    #   4. VCD/VDD LLaVA-Med report
+    #
+    # The same filtered dataframe is then used for RadGraph, RaTEScore,
+    # and CHAIR, ensuring that all metrics are calculated on exactly the
+    # same cases.
+    # ------------------------------------------------------------------
+    required_for_evaluation = [
+        "findings",
+        "impression",
+        BASE_REPORT_COLUMN,
+        vcd_column,
+    ]
+
+    valid_mask = pd.Series(True, index=df_original.index)
+    exclusion_reasons = {}
+
+    for row_index, row in df_original.iterrows():
+        reasons = []
+
+        for column in required_for_evaluation:
+            value = row[column]
+
+            if pd.isna(value):
+                reasons.append(f"{column} is missing")
+            elif not str(value).strip():
+                reasons.append(f"{column} is empty")
+
+        if reasons:
+            exclusion_reasons[row_index] = reasons
+            valid_mask.loc[row_index] = False
+
+    df = df_original.loc[valid_mask].copy().reset_index(drop=True)
+
+    # ------------------------------------------------------------------
+    # Report cohort selection.
+    # ------------------------------------------------------------------
+    original_count = len(df_original)
+    included_count = len(df)
+    excluded_count = original_count - included_count
+
+    print("\n" + "=" * 72)
+    print("EVALUATION COHORT")
+    print("=" * 72)
+    print(f"Input file:       {input_path}")
+    print(f"VCD report column: {vcd_column}")
+    print(f"Total input cases: {original_count}")
+    print(f"Included cases:    {included_count}")
+    print(f"Excluded cases:    {excluded_count}")
+
+    if exclusion_reasons:
+        print("\nExcluded cases:")
+        for row_index, reasons in exclusion_reasons.items():
+            row = df_original.loc[row_index]
+
+            if "uid" in df_original.columns:
+                uid = row["uid"]
+            else:
+                uid = row_index
+
+            filename = row["filename"] if "filename" in df_original.columns else "N/A"
+
+            print(
+                f"  uid={uid} | filename={filename} | "
+                f"reason: {'; '.join(reasons)}"
+            )
+    else:
+        print("\nNo incomplete cases were excluded.")
+
+    if df.empty:
+        raise ValueError(
+            "No complete cases remain after cohort filtering. "
+            "Nothing can be evaluated."
+        )
+
+    print("=" * 72 + "\n")
+
+    # ------------------------------------------------------------------
+    # Prepare the three aligned report lists.
+    # ------------------------------------------------------------------
     references = df.apply(make_reference, axis=1).tolist()
     base_hypotheses = df[BASE_REPORT_COLUMN].map(clean_text).tolist()
     vcd_hypotheses = df[vcd_column].map(clean_text).tolist()
 
-    print(f"Using VCD report column: {vcd_column}")
+    # Defensive checks: these should never fail after cohort filtering.
+    if not (len(references) == len(base_hypotheses) == len(vcd_hypotheses)):
+        raise RuntimeError(
+            "Internal cohort alignment error: references and hypotheses "
+            "have different lengths."
+        )
+
+    print(f"Scoring {len(df)} complete cases.\n")
+
+    # ------------------------------------------------------------------
+    # RadGraph
+    # ------------------------------------------------------------------
     print("Scoring llavamed_report with RadGraph...")
     base_radgraph = score_radgraph(references, base_hypotheses)
+
     print("Scoring VCD reports with RadGraph...")
     vcd_radgraph = score_radgraph(references, vcd_hypotheses)
 
+    # ------------------------------------------------------------------
+    # RaTEScore
+    # ------------------------------------------------------------------
     print("Scoring llavamed_report with RaTEScore...")
     base_ratescore = score_ratescore(references, base_hypotheses)
+
     print("Scoring VCD reports with RaTEScore...")
     vcd_ratescore = score_ratescore(references, vcd_hypotheses)
 
-    print("Loading CheXbert checkpoint and running CHAIR labels...")
+    # ------------------------------------------------------------------
+    # CHAIR
+    # ------------------------------------------------------------------
+    print("\nLoading CheXbert checkpoint and running CHAIR labels...")
     checkpoint = get_chexbert_checkpoint(args.chexbert_checkpoint)
+
     reference_labels, base_labels, vcd_labels = label_all_reports(
         references,
         base_hypotheses,
         vcd_hypotheses,
         checkpoint,
     )
+
     base_chair = calculate_chair_scores(reference_labels, base_labels)
     vcd_chair = calculate_chair_scores(reference_labels, vcd_labels)
 
+    # ------------------------------------------------------------------
+    # Add scores to the filtered evaluation dataframe.
+    # ------------------------------------------------------------------
     add_scores(df, "llavamed", base_radgraph, base_ratescore, base_chair)
     add_scores(df, "vcd", vcd_radgraph, vcd_ratescore, vcd_chair)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(output_path, index=False)
+
     print(f"\nSaved per-row scores to: {output_path}")
 
+    # ------------------------------------------------------------------
+    # Per-row summary
+    # ------------------------------------------------------------------
     print("\nPer-row summary:")
     for row_index, row in df.iterrows():
         uid = row["uid"] if "uid" in df.columns else row_index
@@ -321,11 +439,53 @@ def main():
             f"VCD={row['chair_article_vcd']:.4f}"
         )
 
-    score_columns = [column for column in df.columns if column.startswith(
-        ("radgraph_", "ratescore_", "chair_")
-    )]
-    print("\nMean scores:")
-    print(df[score_columns].mean(numeric_only=True).to_string())
+
+    # ------------------------------------------------------------------
+    # Mean and standard deviation scores
+    # ------------------------------------------------------------------
+    score_columns = [
+        column
+        for column in df.columns
+        if column.startswith(("radgraph_", "ratescore_", "chair_"))
+    ]
+
+    summary_stats = df[score_columns].agg(["mean", "std"]).T
+    summary_stats.columns = ["mean", "std"]
+
+    print("\nMean ± Standard Deviation:")
+    print(summary_stats.to_string(float_format=lambda x: f"{x:.4f}"))
+
+    # Save summary statistics to a separate CSV file
+    summary_path = output_path.with_name(
+        f"{output_path.stem}_summary.csv"
+    )
+    summary_stats.to_csv(summary_path)
+
+    print(f"\nSaved mean and standard deviation to: {summary_path}")
+
+
+    # ------------------------------------------------------------------
+    # Final cohort summary
+    # ------------------------------------------------------------------
+    print("\n" + "=" * 72)
+    print("FINAL SUMMARY")
+    print("=" * 72)
+    print(f"Input cases:      {original_count}")
+    print(f"Evaluated cases:  {included_count}")
+    print(f"Excluded cases:   {excluded_count}")
+
+    if exclusion_reasons:
+        print("\nExclusion breakdown:")
+        reason_counts = {}
+
+        for reasons in exclusion_reasons.values():
+            for reason in reasons:
+                reason_counts[reason] = reason_counts.get(reason, 0) + 1
+
+        for reason, count in sorted(reason_counts.items()):
+            print(f"  {count:>3} × {reason}")
+
+    print("=" * 72)
 
 
 if __name__ == "__main__":
