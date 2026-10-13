@@ -61,7 +61,7 @@ N = 50
 
 #dataset
 DATASET_ROOT = Path(
-    r"/kaggle/input/chest-xrays-indiana-university"
+    r"/root/.cache/kagglehub/datasets/raddar/chest-xrays-indiana-university/versions/2"
 )
 
 REPORTS_CSV = DATASET_ROOT / "indiana_reports.csv"

@@ -61,8 +61,7 @@ gc.collect()
 torch.cuda.empty_cache()
 
 # Root folder downloaded from Kaggle
-#DATASET_ROOT: Path = Path(r"/kaggle/input/chest-xrays-indiana-university") # this is the path you may have to change to direct to the dataset
-DATASET_ROOT: Path = Path(r"/home/20213144/.cache/kagglehub/datasets/raddar/chest-xrays-indiana-university/versions/2") 
+DATASET_ROOT: Path = Path(r"/root/.cache/kagglehub/datasets/raddar/chest-xrays-indiana-university/versions/2") 
 REPORTS_CSV: Path = DATASET_ROOT / "indiana_reports.csv"
 PROJECTIONS_CSV: Path = DATASET_ROOT / "indiana_projections.csv"
 IMAGE_DIR: Path = DATASET_ROOT / "images" / "images_normalized"
