@@ -4,29 +4,15 @@ This repository is a fork of [Microsoft LLaVA-Med](https://github.com/microsoft/
 
 The upstream project documentation is preserved in [`README_llavamed.md`](README_llavamed.md). Refer to it for the original model, serving, and evaluation instructions. This README focuses on the added `PROJECT_*` workflow.
 
-> **Research use only.** Follow the licenses and use restrictions of the upstream LLaVA-Med code, model, data, and all dependencies. Do not use generated reports or this software for clinical care or clinical decision-making.
-
-## Contents
-
-- [What was added](#what-was-added)
-- [Requirements and setup](#requirements-and-setup)
-- [Configure the data and model paths](#configure-the-data-and-model-paths)
-- [Report-generation workflow](#report-generation-workflow)
-- [VCD grid-search workflow](#vcd-grid-search-workflow)
-- [Outputs](#outputs)
-- [Known setup notes](#known-setup-notes)
-- [Information to add](#information-to-add)
-- [Acknowledgements](#acknowledgements)
-
 ## What was added
 
 | File or folder | Purpose |
 | --- | --- |
-| `PROJECT_llavamed_vcd.py` | Generates chest X-ray reports with LLaVA-Med. In its current form, it generates both a baseline report and a VCD report for each selected study. |
+| `PROJECT_llavamed_vcd.py` | Generates chest X-ray reports with LLaVA-Med. In its current form, it generates both a baseline report and a report with VCD for each selected study. |
 | `PROJECT_grid_search.py` | Generates VCD reports for the `alpha`, `beta`, and `noise_step` combinations configured in the script. |
 | `PROJECT_evaluation.py` | Compares baseline and VCD reports using RadGraph, RaTEScore, and CHAIR. Writes per-case scores and summary statistics. |
 | `PROJECT_parameter_selection.py` | Scores grid-search reports with RadGraph, summarizes scores per parameter combination, and reports the best combination for a selected RadGraph metric. |
-| `PROJECT_metrics.py` | A small, manually configured helper for computing RadGraph and RaTEScore for one results CSV. |
+| `PROJECT_metrics.py` | A small helper for computing RadGraph and RaTEScore for one results CSV. |
 | `PROJECT_plot_grid.py` | Creates a RadGraph ER contour plot for a selected beta value from grid-search scores. |
 | `PROJECT_plot_results.py` | Displays example comparison and difference plots using score arrays entered directly in the script. |
 | `PROJECT_VCD/` | VCD noise and sampling implementation files. |
@@ -34,12 +20,10 @@ The upstream project documentation is preserved in [`README_llavamed.md`](README
 
 ## Requirements and setup
 
-The custom scripts depend on the upstream LLaVA-Med environment as well as metric and plotting packages. The model-generation scripts use PyTorch, Transformers, Pillow, and the LLaVA-Med code; evaluation uses RadGraph, RaTEScore, and CheXbert/CHAIR; plotting uses Matplotlib, NumPy, pandas, and SciPy.
+To run the code, it is suggested to use a GPU either from Google Colab (use `llava-med.ipynb` for this set-up)
+or a sufficiently large GPU.
 
-1. Set up the upstream repository and environment following [`README_llavamed.md`](README_llavamed.md#install).
-2. Install or otherwise make available the additional packages required by the scripts you intend to run.
-3. Ensure the LLaVA-Med model checkpoint can be downloaded or accessed. The generation scripts default to `microsoft/llava-med-v1.5-mistral-7b`.
-4. A CUDA-capable GPU is recommended for report generation and metric computation. CPU execution may be extremely slow.
+The following instructions are made to use with a notebook, where dependencies are handled inside the notebook.
 
 > **Dependency versions:** [TODO: record the tested Python, PyTorch/CUDA, Transformers, RadGraph, RaTEScore, CheXbert, and plotting-package versions, ideally in a project-specific requirements file.]
 
@@ -47,12 +31,40 @@ The custom scripts depend on the upstream LLaVA-Med environment as well as metri
 
 The generation scripts currently use hard-coded configuration values. Before running them, edit the relevant settings near the top of each script:
 
-- `DATASET_ROOT` should point to the Indiana University chest X-ray dataset.
+- `DATASET_ROOT` in **both** generation scripts should point to the Indiana University chest X-ray dataset. The scripts currently have different machine-specific paths.
 - The dataset root is expected to contain `indiana_reports.csv`, `indiana_projections.csv`, and `images/images_normalized/`.
-- `N` controls how many usable studies are selected. In `PROJECT_llavamed_vcd.py`, `OPTIMIZATION_N` also controls the starting offset.
-- In `PROJECT_grid_search.py`, update `ALPHA_VALUES`, `BETA_VALUES`, `NOISE_STEP_VALUES`, and `N` to define the grid and sample size.
-- In `PROJECT_llavamed_vcd.py`, review `NOISE_STEP`, `CD_ALPHA`, `CD_BETA`, and `SEED`.
-- Ensure the VCD implementation imports refer to the VCD folder present in this checkout; see [Known setup notes](#known-setup-notes).
+- `PROJECT_grid_search.py` takes the first `N` usable studies after filtering. `PROJECT_llavamed_vcd.py` skips the first `OPTIMIZATION_N` usable studies and then takes the next `N`. With the current settings, these are separate cohorts: studies 1–50 for grid search and studies 51–500 for report generation (assuming at least 500 usable studies and the same data/filter ordering).
+- Update `ALPHA_VALUES`, `BETA_VALUES`, and `NOISE_STEP_VALUES` in `PROJECT_grid_search.py` to change the search grid.
+- Update `NOISE_STEP`, `CD_ALPHA`, `CD_BETA`, and `SEED` in `PROJECT_llavamed_vcd.py` to change its fixed VCD settings.
+
+### Current experiment settings
+
+The values below are the settings currently present in the scripts. Keep this table in sync when changing the experiment configuration.
+
+| Setting | `PROJECT_llavamed_vcd.py` | `PROJECT_grid_search.py` |
+| --- | --- | --- |
+| Model | `microsoft/llava-med-v1.5-mistral-7b` | `microsoft/llava-med-v1.5-mistral-7b` |
+| VCD enabled | `USE_CD = True` | `USE_CD = True` |
+| VCD contrast strength (`alpha`) | `CD_ALPHA = 1.25` | `[0.5, 0.75, 1.0, 1.25, 1.5]` |
+| VCD cutoff (`beta`) | `CD_BETA = 0.05` | `[0.05, 0.1, 0.2, 0.3, 0.4]` |
+| Diffusion noise step | `NOISE_STEP = 100` | `[100, 250, 500, 750, 900]` |
+| Random seed | `SEED = 21` | `SEED = 20` |
+| Number of studies (`N`) | `450` | `50` |
+| Starting offset (`OPTIMIZATION_N`) | `50` | Not used |
+| Decoding | Sampling enabled; temperature `0.7`; top-p `0.9`; max `512` new tokens | Sampling enabled; temperature `0.7`; top-p `0.9`; max `512` new tokens |
+| Model loading | 4-bit enabled; 8-bit disabled | 4-bit enabled; 8-bit disabled |
+
+The grid therefore contains `5 × 5 × 5 = 125` parameter combinations and generates up to `125 × 50 = 6,250` reports. `PROJECT_llavamed_vcd.py` generates both baseline and VCD reports for each of its 450 selected studies. Although `USE_CD` is `True`, the script's inference loop still explicitly runs both modes; do not interpret this flag as making that script VCD-only.
+
+The dataset roots are currently set to `/home/20213144/.cache/kagglehub/datasets/raddar/chest-xrays-indiana-university/versions/2` in `PROJECT_llavamed_vcd.py` and `/kaggle/input/chest-xrays-indiana-university` in `PROJECT_grid_search.py`. Replace each with the correct path for your environment.
+
+### Evaluation and analysis defaults
+
+| Script | Current default |
+| --- | --- |
+| `PROJECT_evaluation.py` | Input: `PROJECT_RESULTS/llavamed_results_450_vcd(1).csv`; output: corresponding `_metrics.csv`; VCD report column is auto-detected. |
+| `PROJECT_parameter_selection.py` | Input: `merged.csv`; per-row output: `radgraph_grid_scores.csv`; grouped summary: `radgraph_grid_summary.csv`; batch size: `16`; best setting selected by `radgraph_er`. |
+| `PROJECT_plot_grid.py` | Plots only `beta = 0.05`; default output: `PROJECT_RESULTS/radgraph_er_contour_beta_005.png`. |
 
 The scripts expect the Indiana dataset columns used by their code, including report fields such as `uid`, `findings`, and `impression`, plus projection/image filename fields used to locate each image.
 
@@ -66,21 +78,19 @@ After configuring the data and VCD paths, run:
 python PROJECT_llavamed_vcd.py
 ```
 
-The script selects usable studies, loads the model, and writes a results CSV under `results/`. By default, the output name is `llavamed_results_450_vcd.csv` (the number reflects the configured sample size).
+The script selects usable studies, loads the model, and writes a results CSV under `PROJECT_RESULTS/`. By default, the output name is `llavamed_results_450_vcd.csv` (the number reflects the configured sample size).
 
 The generated CSV includes the source study information and report columns:
 
 - `llavamed_report`: baseline report
 - `llavamed_report_with_VCD`: VCD report
 
-**Current behavior:** although the script has a top-level `USE_CD` setting, its inference loop is currently hard-coded to generate both baseline and VCD variants. Treat the paired output as the supported behavior unless the loop and corresponding output-column handling are changed together.
-
 ### Evaluate report quality
 
 `PROJECT_evaluation.py` reads the paired reports, excludes rows missing any required reference or generated report, and evaluates the same remaining cases with:
 
 - **RadGraph:** entity, entity-relation, and partial entity-relation scores
-- **RaTEScore**
+- **RaTEScore** extended RaTEScore with better synonym and negation handling
 - **CHAIR:** CheXbert-based finding-label comparison
 
 Example, with paths supplied explicitly:
@@ -147,22 +157,6 @@ Exact names may differ when script settings or command-line output paths are cha
 ## Known setup notes
 
 - The VCD imports and CHAIR subprocess path resolve to `PROJECT_VCD/` and `PROJECT_CHAIR/` relative to the script files, so they do not depend on the current working directory.
-- `PROJECT_llavamed_vcd.py` runs both report-generation modes through its `using_vcd` loop. Changing only the top-level `USE_CD` value does not currently make this a baseline-only or VCD-only run.
+- `PROJECT_llavamed_vcd.py` runs both report-generation modes through its `using_vcd` loop. (Changing only the top-level `USE_CD` value does not currently make this a baseline-only or VCD-only run.)
 - `PROJECT_metrics.py` uses the bundled `PROJECT_RESULTS/llavamed_results_450_vcd.csv` by default and builds its reference report from `findings` only. For the paired baseline/VCD comparison and full metric set, use `PROJECT_evaluation.py`.
 - `PROJECT_plot_results.py` uses example values defined in arrays near the top of the file, displays two figures, and does not load evaluation CSVs or save the plots. Replace those values with your own results before using it for reporting.
-- Output folders, dataset paths, checkpoint availability, and package/model access may need adjustment for your machine.
-
-## Information to add
-
-- [ ] Tested hardware, operating system, and environment setup
-- [ ] Exact commands and parameter settings used for the final experiments
-- [ ] Dataset source/version, selection criteria, and number of included studies
-- [ ] Metric interpretation and the metric used to select the final parameters
-- [ ] Final results and links to generated figures/tables
-- [ ] Any additional licenses or acknowledgements applicable to the added code and data
-
-## Acknowledgements
-
-This repository builds on [Microsoft LLaVA-Med](https://github.com/microsoft/LLaVA-Med). Please also cite and acknowledge the original LLaVA-Med and VCD work, the Indiana University chest X-ray dataset, and the metric implementations used in your experiments.
-
-[TODO: Add the full citations and describe the authors' contributions to this fork.]
