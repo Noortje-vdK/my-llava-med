@@ -1,17 +1,3 @@
-"""
-Author: GROUP 10 
-Last changed: 2026/09/20
-
-Aim script:
-
-Python script is based on the test.py function in the GitHub setup by Noortje (based on LLaVA-MED)
-Here changes are made such that it includes VCD
-
-One note: it does not follow the example of the GithUb page of VCD. Namely, their implementation of VCD for LLaVA-MED is based on an old architecture of LLaVA-MED.
-In the newer version (that we use) there are some changes in how the input is processed. The code below is based on the new input process.
-
-In case there is a prefix with CD, it stands for the processing of the Contrastive Decoding image (so the image with noise applied)
-"""
 
 from pathlib import Path
 from typing import Any
@@ -30,9 +16,6 @@ from llava.constants import IMAGE_TOKEN_INDEX
 from llava.conversation import conv_templates
 import gc
 
-# ------------------------------------------------- BELOW NEW
-
-# Imports needed due to the VCD implementation
 # MistralForCausalLM: a language model that is normally called within LLaVA-MED itself, but now we need to call it in this script
 # set_seed: used for reproducibility of the sampled noise
 from transformers import MistralForCausalLM, set_seed
@@ -54,8 +37,6 @@ SEED: int = 21             # For reprodubility of the random sampled noise
 # This is adapted for the transformer 4.36.x.
 if USE_CD:
     evolve_vcd_sampling()
-
-# ------------------------------------------------- END NEW
 
 gc.collect()
 torch.cuda.empty_cache()
@@ -261,42 +242,8 @@ tokenizer, model, image_processor, context_len = (
 model.eval()
 projector = model.model.mm_projector
 
-# print("Projector class:", type(projector))
-
-# for name, param in projector.named_parameters():
-#     print(
-#         name,
-#         "shape=", tuple(param.shape),
-#         "dtype=", param.dtype,
-#         "device=", param.device,
-#     )
-# print("\nModel config:")
-# print("mm_vision_tower:", model.config.mm_vision_tower)
-# print("mm_hidden_size:", getattr(model.config, "mm_hidden_size", None))
-# print("mm_projector_type:", getattr(model.config, "mm_projector_type", None))
-# print("image_aspect_ratio:", getattr(model.config, "image_aspect_ratio", None))
-# print("mm_vision_select_layer:", getattr(model.config, "mm_vision_select_layer", None))
-# print("mm_vision_select_feature:", getattr(model.config, "mm_vision_select_feature", None))
-
-# print("LLaVA-Med loaded.")
-# print("Model device:", next(model.parameters()).device)
-# print("Context length:", context_len)
 
 vision_tower = model.get_vision_tower()
-
-# print("\n===== VISION TOWER DEBUG =====")
-# print("Vision tower type:", type(vision_tower))
-# print("Vision tower loaded:", vision_tower.is_loaded)
-# print("Vision tower device:", next(vision_tower.parameters()).device)
-# print("Vision tower dtype:", next(vision_tower.parameters()).dtype)
-
-# print("\nProjector:")
-# print("Projector device:", next(model.model.mm_projector.parameters()).device)
-# print("Projector dtype:", next(model.model.mm_projector.parameters()).dtype)
-
-# print("\nModel:")
-# print("Model type:", type(model))
-# print("Model device:", next(model.parameters()).device)
 
 
 # ------------------------------------------------- BELOW NEW

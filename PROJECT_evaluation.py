@@ -319,9 +319,7 @@ def main():
 
     df = df_original.loc[valid_mask].copy().reset_index(drop=True)
 
-    # ------------------------------------------------------------------
-    # Report cohort selection.
-    # ------------------------------------------------------------------
+    # report the filtering results
     original_count = len(df_original)
     included_count = len(df)
     excluded_count = original_count - included_count
@@ -362,9 +360,7 @@ def main():
 
     print("=" * 72 + "\n")
 
-    # ------------------------------------------------------------------
-    # Prepare the three aligned report lists.
-    # ------------------------------------------------------------------
+    # report the number of cases that will be scored
     references = df.apply(make_reference, axis=1).tolist()
     base_hypotheses = df[BASE_REPORT_COLUMN].map(clean_text).tolist()
     vcd_hypotheses = df[vcd_column].map(clean_text).tolist()
@@ -378,27 +374,21 @@ def main():
 
     print(f"Scoring {len(df)} complete cases.\n")
 
-    # ------------------------------------------------------------------
-    # RadGraph
-    # ------------------------------------------------------------------
+    # radgraph
     print("Scoring llavamed_report with RadGraph...")
     base_radgraph = score_radgraph(references, base_hypotheses)
 
     print("Scoring VCD reports with RadGraph...")
     vcd_radgraph = score_radgraph(references, vcd_hypotheses)
 
-    # ------------------------------------------------------------------
-    # RaTEScore
-    # ------------------------------------------------------------------
+    # ratescore
     print("Scoring llavamed_report with RaTEScore...")
     base_ratescore = score_ratescore(references, base_hypotheses)
 
     print("Scoring VCD reports with RaTEScore...")
     vcd_ratescore = score_ratescore(references, vcd_hypotheses)
 
-    # ------------------------------------------------------------------
-    # CHAIR
-    # ------------------------------------------------------------------
+    # chair
     print("\nLoading CheXbert checkpoint and running CHAIR labels...")
     checkpoint = get_chexbert_checkpoint(args.chexbert_checkpoint)
 
@@ -412,9 +402,7 @@ def main():
     base_chair = calculate_chair_scores(reference_labels, base_labels)
     vcd_chair = calculate_chair_scores(reference_labels, vcd_labels)
 
-    # ------------------------------------------------------------------
-    # Add scores to the filtered evaluation dataframe.
-    # ------------------------------------------------------------------
+    # add scores to the dataframe
     add_scores(df, "llavamed", base_radgraph, base_ratescore, base_chair)
     add_scores(df, "vcd", vcd_radgraph, vcd_ratescore, vcd_chair)
 
@@ -423,9 +411,7 @@ def main():
 
     print(f"\nSaved per-row scores to: {output_path}")
 
-    # ------------------------------------------------------------------
-    # Per-row summary
-    # ------------------------------------------------------------------
+    # per row summary
     print("\nPer-row summary:")
     for row_index, row in df.iterrows():
         uid = row["uid"] if "uid" in df.columns else row_index
@@ -440,9 +426,7 @@ def main():
         )
 
 
-    # ------------------------------------------------------------------
-    # Mean and standard deviation scores
-    # ------------------------------------------------------------------
+    # mean and std 
     score_columns = [
         column
         for column in df.columns
@@ -464,9 +448,7 @@ def main():
     print(f"\nSaved mean and standard deviation to: {summary_path}")
 
 
-    # ------------------------------------------------------------------
-    # Final cohort summary
-    # ------------------------------------------------------------------
+    # final summary
     print("\n" + "=" * 72)
     print("FINAL SUMMARY")
     print("=" * 72)
